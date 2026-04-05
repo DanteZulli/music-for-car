@@ -1,182 +1,182 @@
 # music-for-car.sh
 
-Bash script para procesar musica de cualquier formato a MP3 optimizado para pendrive de auto.
+Bash script to convert audio files from any format to MP3 optimized for car USB drives.
 
-## Contexto
+## Context
 
-Creado para mi **Sony CDX-GT500US** con un pendrive de 64GB. La musica original estaba en FLAC (y otros formatos) con portadas, lyrics files, y nombres con caracteres especiales que el estereo no leia correctamente.
+Created for my **Sony CDX-GT500US** with a 64GB USB drive. The original music was in FLAC (and other formats) with cover art, lyrics files, and special characters in filenames that the stereo couldn't read correctly.
 
-## Que hace
+## What it does
 
-- **Convierte** todo audio (FLAC, OGG, OPUS, M4A, WAV, AAC, WMA) a **MP3 256kbps CBR**
-- **Normaliza** volumen con `loudnorm` two-pass (I=-16 LUFS, TP=-1.5 dBTP, LRA=11 LU)
-- **Highpass** a 100 Hz para eliminar rumble que los parlantes del auto no reproducen
-- **Sanea** nombres de carpetas y archivos a ASCII puro (sin acentos, sin simbolos raros)
-- **Limpia** metadatos ID3: solo deja title, artist, album, track, genre
-- **Solo audio**: descarta imagenes de portada, archivos .lrc, y cualquier no-audio
+- **Converts** all audio (FLAC, OGG, OPUS, M4A, WAV, AAC, WMA) to **MP3 256kbps CBR**
+- **Normalizes** volume with `loudnorm` two-pass (I=-16 LUFS, TP=-1.5 dBTP, LRA=11 LU)
+- **Highpass** at 100 Hz to eliminate rumble that car speakers can't reproduce
+- **Sanitizes** folder and file names to pure ASCII (no accents, no weird symbols)
+- **Cleans** ID3 metadata: keeps only title, artist, album, track, genre
+- **Audio only**: discards cover images, .lrc files, and anything non-audio
 
-## Requisitos
+## Requirements
 
-- `ffmpeg` (con libmp3lame)
-- `ffprobe` (viene con ffmpeg)
+- `ffmpeg` (with libmp3lame)
+- `ffprobe` (ships with ffmpeg)
 - `iconv`
-- `fatsort` (para ordenar fisicamente el pendrive despues de copiar)
+- `fatsort` (to physically sort the USB drive after copying)
 
-## Uso
+## Usage
 
 ```bash
-./music-for-car.sh <carpeta_fuente> <carpeta_destino>
+./music-for-car.sh <source_dir> <dest_dir>
 ```
 
-### Un album individual
+### Single album
 
 ```bash
 ./music-for-car.sh ~/Music/"2 Minutos - Vida Monotona (2015)" ~/mp3_para_auto
 ```
 
-Procesa un solo album y lo guarda como `Banda - Album` en el destino.
+Processes a single album and saves it as `Band - Album` in the destination.
 
-### Toda la musica
-
-```bash
-./music-for-car.sh ~/Music ~/mp3_para_auto
-```
-
-Procesa todos los albums en el directorio fuente y los guarda como `NN - Banda - Album` (numerados secuencialmente).
-
-## Flujo completo para el pendrive
-
-### 1. Procesar la musica
+### All music
 
 ```bash
 ./music-for-car.sh ~/Music ~/mp3_para_auto
 ```
 
-### 2. Formatear el pendrive en FAT32
+Processes all albums in the source directory and saves them as `NN - Band - Album` (sequentially numbered).
+
+## Full USB drive workflow
+
+### 1. Process the music
 
 ```bash
-# Verificar el dispositivo correcto con lsblk
+./music-for-car.sh ~/Music ~/mp3_para_auto
+```
+
+### 2. Format the USB drive as FAT32
+
+```bash
+# Verify the correct device with lsblk
 lsblk
 
-# Desmontar
+# Unmount
 sudo umount /dev/sdX1
 
-# Formatear
-sudo mkfs.vfat -F 32 -n "MUSICA_AUTO" /dev/sdX1
+# Format
+sudo mkfs.vfat -F 32 -n "CAR_MUSIC" /dev/sdX1
 ```
 
-### 3. Copiar los archivos
+### 3. Copy the files
 
 ```bash
-# Montar
-sudo mount /dev/sdX1 /run/media/dante/MUSICA_AUTO
+# Mount
+sudo mount /dev/sdX1 /run/media/dante/CAR_MUSIC
 
-# Copiar
-cp -r ~/mp3_para_auto/* /run/media/dante/MUSICA_AUTO/
+# Copy
+cp -r ~/mp3_para_auto/* /run/media/dante/CAR_MUSIC/
 ```
 
-### 4. Ordenar con fatsort (CRUCIAL)
+### 4. Sort with fatsort (CRUCIAL)
 
-El Sony CDX-GT500US lee los archivos en el orden fisico en que aparecen en la tabla de directorios FAT, **no** en orden alfabetico. `fatsort` reordena fisicamente las entradas para que el estereo los lea correctamente.
+The Sony CDX-GT500US reads files in the physical order they appear in the FAT directory table, **not** alphabetically. `fatsort` physically reorders the entries so the stereo reads them correctly.
 
 ```bash
-# Desmontar primero (fatsort requiere el dispositivo desmontado)
-sudo umount /run/media/dante/MUSICA_AUTO
+# Unmount first (fatsort requires the device to be unmounted)
+sudo umount /run/media/dante/CAR_MUSIC
 
-# Ordenar
+# Sort
 sudo fatsort /dev/sdX1
 
-# Volver a montar
-sudo mount /dev/sdX1 /run/media/dante/MUSICA_AUTO
+# Remount
+sudo mount /dev/sdX1 /run/media/dante/CAR_MUSIC
 ```
 
-### 5. Desmontar y usar
+### 5. Unmount and use
 
 ```bash
-sudo umount /run/media/dante/MUSICA_AUTO
+sudo umount /run/media/dante/CAR_MUSIC
 ```
 
-## Formato de carpeta esperado
+## Expected folder format
 
-El script espera que la carpeta fuente tenga albums con el formato:
+The script expects the source directory to contain albums formatted as:
 
 ```
-Banda - Nombre del Disco (Anio)/
-  01 - Cancion.flac
-  02 - Cancion.flac
+Band - Album Name (Year)/
+  01 - Song.flac
+  02 - Song.flac
   cover.jpg
 ```
 
-El `(Anio)` al final es opcional. Todo lo demas se parsea como `Banda` y `Disco`.
+The `(Year)` at the end is optional. Everything else is parsed as `Band` and `Album`.
 
-## Formato de salida
+## Output format
 
-### Carpetas
+### Folders
 
-- **Modo multi-album**: `01 - Banda - Nombre del Disco`
-- **Modo album individual**: `Banda - Nombre del Disco`
+- **Multi-album mode**: `01 - Band - Album Name`
+- **Single album mode**: `Band - Album Name`
 
-### Archivos
+### Files
 
-- `01 - Nombre de la Cancion.mp3`
-- `02 - Otra Cancion.mp3`
+- `01 - Song Name.mp3`
+- `02 - Another Song.mp3`
 
-Todos los nombres son ASCII puro: sin acentos, sin `n`, sin comillas, sin parentesis.
+All names are pure ASCII: no accents, no ñ, no quotes, no parentheses.
 
 ### Audio
 
-| Propiedad | Valor |
+| Property | Value |
 |---|---|
 | Codec | MP3 (libmp3lame) |
 | Bitrate | 256 kbps CBR |
 | Sample rate | 44100 Hz |
-| Canales | 2 (stereo) |
+| Channels | 2 (stereo) |
 | Highpass | 100 Hz |
 | Loudness | -16 LUFS (two-pass loudnorm) |
 | True Peak | -1.5 dBTP |
 | LRA | 11 LU |
 
-### Metadatos ID3v2.3
+### ID3v2.3 Metadata
 
-Solo se incluyen: `title`, `artist`, `album`, `track`, `genre`. Se elimina todo lo demas (imagenes embedidas, comentarios, encoder info, etc.).
+Only includes: `title`, `artist`, `album`, `track`, `genre`. Everything else is stripped (embedded images, comments, encoder info, etc.).
 
-## Por que estas decisiones
+## Why these decisions
 
 ### MP3 256kbps CBR
 
-- Maxima compatibilidad con estereos de auto
-- CBR es mas estable para decodificadores viejos que VBR
-- 256kbps es transparente para la mayoria de los oyentes
-- Ahorra espacio vs FLAC (~4-5x menos)
+- Maximum compatibility with car stereos
+- CBR is more stable for older decoders than VBR
+- 256kbps is transparent for most listeners
+- Saves space vs FLAC (~4-5x less)
 
-### Highpass a 100 Hz
+### Highpass at 100 Hz
 
-Los parlantes de auto no reproducen frecuencias por debajo de ~80-100 Hz. Eliminarlas ahorra bitrate que se desperdiciaria en informacion inaudible.
+Car speakers can't reproduce frequencies below ~80-100 Hz. Removing them saves bitrate that would otherwise be wasted on inaudible information.
 
 ### Loudnorm two-pass
 
-Cada album/cancion tiene un nivel de mastering diferente. Sin normalizacion, hay que ajustar el volumen manualmente entre temas. El two-pass de loudnorm mide primero el loudness real de cada archivo y luego aplica la correccion exacta para que todo suene al mismo volumen percibido.
+Each album/song has a different mastering level. Without normalization, you'd have to manually adjust volume between tracks. The two-pass loudnorm first measures the actual loudness of each file, then applies the exact correction so everything plays at the same perceived volume.
 
 ### fatsort
 
-Sin fatsort, el estereo lee los archivos en el orden en que fueron escritos al sistema de archivos FAT, que depende del filesystem y no del nombre. Esto hace que las canciones suenen en orden aleatorio. `fatsort` reordena las entradas del directorio fisicamente en el dispositivo para que coincidan con el orden alfabetico.
+Without fatsort, the stereo reads files in the order they were written to the FAT filesystem, which depends on the filesystem and not the name. This causes songs to play in random order. `fatsort` physically reorders the directory entries on the device to match alphabetical order.
 
-### Solo stream de audio (-map 0:a)
+### Audio stream only (-map 0:a)
 
-Los FLAC suelen tener imagenes de portada embedidas como streams de video. Sin `-map 0:a`, ffmpeg las incluiria en el MP3 como imagenes PNG/JPEG embedidas, inflando el archivo innecesariamente.
+FLAC files often have cover art embedded as video streams. Without `-map 0:a`, ffmpeg would include them in the MP3 as embedded PNG/JPEG images, unnecessarily inflating file size.
 
-## Consideraciones
+## Considerations
 
-- FAT32 tiene limite de 4GB por archivo (no aplica para MP3)
-- No superar ~500-600 archivos por carpeta para evitar problemas en estereos viejos
-- Mantener un solo nivel de directorios (carpetas de album, sin subcarpetas)
-- Nombres de archivo/carpeta maximo 64 caracteres para compatibilidad
-- Si se agregan o eliminan archivos en el futuro, volver a correr `fatsort`
+- FAT32 has a 4GB per-file limit (not relevant for MP3)
+- Don't exceed ~500-600 files per folder to avoid issues with older stereos
+- Keep a single directory level (album folders, no subfolders)
+- File/folder names max 64 characters for compatibility
+- If files are added or removed in the future, re-run `fatsort`
 
 ## Log
 
-Cada ejecucion genera un `processing.log` en el directorio destino con el detalle de cada archivo procesado.
+Each run generates a `processing.log` in the destination directory with details of every processed file.
 
-## Licencia
+## License
 
-Personal. Uso libre.
+Personal. Free to use.

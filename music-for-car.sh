@@ -4,21 +4,21 @@ set -euo pipefail
 ###############################################################################
 # music-for-car.sh
 #
-# Procesa carpetas de musica para un pendrive de auto (Sony CDX-GT500US):
-#   - Renombra carpetas: "Banda - Disco" (sin caracteres especiales)
-#   - Convierte TODO a MP3 256kbps CBR
-#   - Aplica highpass a 100 Hz + loudnorm (I=-16, TP=-1.5, LRA=11)
-#   - Sanea metadatos ID3
+# Processes music folders for a car USB drive (Sony CDX-GT500US):
+#   - Renames folders: "Band - Album" (no special characters)
+#   - Converts EVERYTHING to MP3 256kbps CBR
+#   - Applies highpass at 100 Hz + loudnorm (I=-16, TP=-1.5, LRA=11)
+#   - Cleans ID3 metadata
 #
-# Uso:
-#   ./music-for-car.sh <carpeta_fuente> <carpeta_destino>
+# Usage:
+#   ./music-for-car.sh <source_dir> <dest_dir>
 ###############################################################################
 
 if [ $# -lt 2 ]; then
-    echo "Uso: $0 <carpeta_fuente> <carpeta_destino>"
+    echo "Usage: $0 <source_dir> <dest_dir>"
     echo ""
-    echo "  carpeta_fuente  - Carpeta con albumes (o un album individual)"
-    echo "  carpeta_destino - Donde se guardan los MP3 procesados"
+    echo "  source_dir  - Folder with albums (or a single album)"
+    echo "  dest_dir    - Where processed MP3s are saved"
     exit 1
 fi
 
@@ -32,7 +32,7 @@ mkdir -p "$WORK_DIR"
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 
 ###############################################################################
-# Sanear nombres: ASCII, sin caracteres raros
+# Sanitize names: ASCII, no weird characters
 ###############################################################################
 sanitize() {
     echo "$1" \
@@ -45,7 +45,7 @@ sanitize() {
 }
 
 ###############################################################################
-# Extraer "Banda - Disco" del nombre de carpeta original
+# Extract "Band - Album" from original folder name
 ###############################################################################
 parse_band_album() {
     local raw="$1"
@@ -58,7 +58,7 @@ parse_band_album() {
 }
 
 ###############################################################################
-# Contar archivos de audio en una carpeta
+# Count audio files in a folder
 ###############################################################################
 count_audio_files() {
     local dir="$1"
@@ -70,7 +70,7 @@ count_audio_files() {
 }
 
 ###############################################################################
-# Convertir un archivo de audio a MP3 256k CBR con highpass + loudnorm
+# Convert an audio file to MP3 256k CBR with highpass + loudnorm
 ###############################################################################
 convert_to_mp3() {
     local input="$1"
@@ -86,7 +86,7 @@ convert_to_mp3() {
     song_name=$(echo "$song_name" | sed -E 's/^[0-9]+[. -]+//')
 
     # Two-pass loudnorm
-    # Pass 1: Medir
+    # Pass 1: Measure
     local measured
     measured=$(ffmpeg -nostdin -i "$input" -af "loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json" -f null - 2>&1 \
         | grep -A 20 '"input_' || true)
@@ -104,7 +104,7 @@ convert_to_mp3() {
     input_thresh=${input_thresh:--34.0}
     target_offset=${target_offset:-0.0}
 
-    # Pass 2: Convertir con filtros + metadatos limpios (solo stream de audio)
+    # Pass 2: Convert with filters + clean metadata (audio stream only)
     ffmpeg -nostdin -y -i "$input" \
         -map 0:a -af "highpass=f=100,loudnorm=I=-16:TP=-1.5:LRA=11:measured_I=${input_i}:measured_TP=${input_tp}:measured_LRA=${input_lra}:measured_thresh=${input_thresh}:offset=${target_offset}:linear=true" \
         -codec:a libmp3lame -b:a 256k -ar 44100 -ac 2 \
@@ -124,12 +124,12 @@ convert_to_mp3() {
 # MAIN
 ###############################################################################
 log "=========================================="
-log "Inicio del procesamiento"
-log "Directorio fuente: $MUSIC_DIR"
-log "Directorio destino: $WORK_DIR"
+log "Starting processing"
+log "Source directory: $MUSIC_DIR"
+log "Destination directory: $WORK_DIR"
 log "=========================================="
 
-# Determinar si MUSIC_DIR es un album individual o un directorio con multiples albumes
+# Determine if MUSIC_DIR is a single album or a directory with multiple albums
 if count_audio_files "$MUSIC_DIR" | grep -q '^[1-9]'; then
     FOLDERS=("$MUSIC_DIR")
 else
@@ -146,7 +146,7 @@ for folder in "${FOLDERS[@]}"; do
 
     audio_count=$(count_audio_files "$folder")
     if [ "$audio_count" -eq 0 ]; then
-        log "SKIP (sin audio): $folder_name"
+        log "SKIP (no audio): $folder_name"
         SKIPPED=$((SKIPPED + 1))
         continue
     fi
@@ -158,7 +158,7 @@ for folder in "${FOLDERS[@]}"; do
     dest_folder_name="$band - $album"
     dest_path="$WORK_DIR/$dest_folder_name"
 
-    log "[$COUNTER/$TOTAL] Procesando: $folder_name -> $dest_folder_name ($audio_count archivos)"
+    log "[$COUNTER/$TOTAL] Processing: $folder_name -> $dest_folder_name ($audio_count files)"
 
     mkdir -p "$dest_path"
 
@@ -170,9 +170,9 @@ for folder in "${FOLDERS[@]}"; do
         file_base=$(basename "$audio_file")
         file_no_ext="${file_base%.*}"
 
-        # Limpiar prefijos numericos del nombre (puede haber multiples: "01 - 01 - ...")
+        # Strip numeric prefixes from name (can be multiple: "01 - 01 - ...")
         file_no_ext=$(echo "$file_no_ext" | sed -E 's/^([0-9]+[. -]+)+//')
-        # Limpiar prefijos tipo "Banda_Nombre_XX_" (nombres compuestos con track embebido)
+        # Strip prefixes like "Band_Name_XX_" (compound names with embedded track number)
         embedded_track=$(echo "$file_no_ext" | grep -oP '(?<=_)[0-9]{2}(?=_)' | head -1 || true)
         if [ -n "$embedded_track" ]; then
             file_no_ext=$(echo "$file_no_ext" | sed -E "s/^.*_${embedded_track}_//")
@@ -182,7 +182,7 @@ for folder in "${FOLDERS[@]}"; do
         out_name=$(sanitize "$out_name")
         out_path="$dest_path/$out_name"
 
-        # Extraer track original para metadatos
+        # Extract original track number for metadata
         orig_track=$(ffprobe -v quiet -show_entries format_tags=track -of csv=p=0 "$audio_file" 2>/dev/null || echo "")
         orig_track=$(echo "$orig_track" | cut -d'/' -f1 | sed 's/^0*//')
         [ -z "$orig_track" ] || [ "$orig_track" -eq 0 ] 2>/dev/null && orig_track="$padded_track"
@@ -206,12 +206,12 @@ for folder in "${FOLDERS[@]}"; do
         -iname "*.aac" -o -iname "*.wma" -o -iname "*.alac" \
     \) | sort)
 
-    log "  Completado: $dest_folder_name ($file_counter archivos convertidos)"
+    log "  Completed: $dest_folder_name ($file_counter files converted)"
 done
 
 log "=========================================="
-log "Procesamiento finalizado"
-log "Total carpetas: $TOTAL"
-log "Carpetas procesadas: $((TOTAL - SKIPPED))"
-log "Carpetas sin audio: $SKIPPED"
+log "Processing finished"
+log "Total folders: $TOTAL"
+log "Folders processed: $((TOTAL - SKIPPED))"
+log "Folders without audio: $SKIPPED"
 log "=========================================="

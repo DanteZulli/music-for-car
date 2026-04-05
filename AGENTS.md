@@ -32,5 +32,4 @@ A single bash script (`music-for-car.sh`) that converts audio files to MP3 optim
 
 ## Conventions
 
-- Spanish comments/messages throughout the script.
 - `set -euo pipefail` — script fails fast on any error.

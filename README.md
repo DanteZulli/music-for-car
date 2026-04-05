@@ -14,11 +14,11 @@ Created for my **Sony CDX-GT500US** with a 64GB USB drive. The original music wa
 
 ## What it does
 
-- **Converts** all audio (FLAC, OGG, OPUS, M4A, WAV, AAC, WMA) to **MP3 256kbps CBR**
-- **Normalizes** volume with `loudnorm` two-pass (I=-16 LUFS, TP=-1.5 dBTP, LRA=11 LU)
-- **Highpass** at 100 Hz to eliminate rumble that car speakers can't reproduce
+- **Converts** all audio (FLAC, OGG, OPUS, M4A, WAV, AAC, WMA) to **MP3 CBR**
+- **Normalizes** volume with `loudnorm` (two-pass by default, single-pass optional)
+- **Highpass** filter to eliminate rumble that car speakers can't reproduce
 - **Sanitizes** folder and file names to pure ASCII (no accents, no weird symbols)
-- **Cleans** ID3 metadata: keeps only title, artist, album, track, genre
+- **Cleans** ID3 metadata: keeps only title, artist, album, track
 - **Audio only**: discards cover images, .lrc files, and anything non-audio
 
 ## Requirements
@@ -31,31 +31,120 @@ Created for my **Sony CDX-GT500US** with a 64GB USB drive. The original music wa
 ## Usage
 
 ```bash
-./music-for-car.sh <source_dir> <dest_dir>
+./music-for-car.sh [-p profile] <source_dir> <dest_dir>
 ```
 
-### Single album
-
-```bash
-./music-for-car.sh ~/Music/"2 Minutos - Vida Monotona (2015)" ~/mp3_para_auto
-```
-
-Processes a single album and saves it as `Band - Album` in the destination.
-
-### All music
+### Default profile
 
 ```bash
 ./music-for-car.sh ~/Music ~/mp3_para_auto
 ```
 
-Processes all albums in the source directory and saves them as `NN - Band - Album` (sequentially numbered).
+### With a specific profile
+
+```bash
+./music-for-car.sh -p classic_cargo ~/Music ~/mp3_para_auto
+```
+
+### Single album
+
+```bash
+./music-for-car.sh ~/Music/"Band - Album (2015)" ~/mp3_para_auto
+```
+
+### List available profiles
+
+```bash
+./music-for-car.sh
+```
+
+## Profiles
+
+Profiles live in `profiles/*.conf`. They are simple shell-compatible config files — `#` for comments, `KEY="value"` for settings.
+
+### Creating a custom profile
+
+Copy an existing profile and modify:
+
+```bash
+cp profiles/default.conf profiles/my_car.conf
+```
+
+Then use it:
+
+```bash
+./music-for-car.sh -p my_car ~/Music ~/mp3_para_auto
+```
+
+### Config options
+
+| Key | Default | Description |
+|---|---|---|
+| `PROFILE_NAME` | `"Default"` | Human-readable name, shown in logs |
+| `HIGHPASS_FREQ` | `"100"` | Highpass filter frequency in Hz. Set to `0` to disable |
+| `LOUDNORM_I` | `"-16"` | Integrated loudness target (LUFS) |
+| `LOUDNORM_TP` | `"-1.5"` | True peak limit (dBTP) |
+| `LOUDNORM_LRA` | `"11"` | Loudness range target (LU) |
+| `BITRATE` | `"256k"` | MP3 bitrate |
+| `SAMPLE_RATE` | `"44100"` | Output sample rate in Hz |
+| `FFMPEG_THREADS` | `"0"` | ffmpeg thread count (`0` = auto-detect) |
+| `FAST_LOUDNORM` | `"false"` | Use single-pass loudnorm (faster, less accurate) |
+| `PARALLEL` | `"false"` | Process files within each album in parallel |
+
+### Included profiles
+
+- **`default`** — Generic starting point. Two-pass loudnorm, sequential processing.
+- **`classic_cargo`** — Tuned for Sony CDX-GT500US + 4" speakers. Two-pass loudnorm, parallel processing, multi-threaded ffmpeg.
+
+## Understanding the audio settings
+
+### MP3 CBR
+
+Constant bitrate is more compatible with older car stereo decoders than VBR. 256kbps is transparent for most listeners and saves ~4-5x space vs FLAC.
+
+**When to change:**
+- Lower to `192k` if USB space is tight (still good quality)
+- Raise to `320k` if you have premium speakers and can hear the difference
+
+### Highpass filter
+
+Car speakers — especially small ones (4" or less) — can't reproduce frequencies below ~80-100 Hz. Those frequencies just waste bitrate and can cause distortion.
+
+**When to change:**
+- Set to `0` (disabled) if your car has a proper subwoofer
+- Lower to `80` if your speakers handle lows better
+- Raise to `120` if you have very small speakers (3" or less)
+
+### Loudnorm (EBU R128 normalization)
+
+Every album is mastered at a different level. Without normalization, you constantly adjust volume between tracks. `loudnorm` measures and corrects loudness so everything plays at the same perceived volume.
+
+**Two-pass** (default): measures each file first, then applies precise correction. Best quality.
+**Single-pass** (`FAST_LOUDNORM="true"`): estimates and applies in one go. ~2x faster, slightly less accurate.
+
+**When to change:**
+- `LOUDNORM_I`: `-16` is streaming standard. Use `-14` for louder playback, `-20` for more dynamic range
+- `LOUDNORM_LRA`: `11` preserves dynamics. Lower to `7` for more consistent loudness (pop/EDM), raise to `15` for classical/jazz
+- `LOUDNORM_TP`: `-1.5` prevents clipping. Don't raise above `-1.0`
+
+### Parallel processing
+
+When `PARALLEL="true"`, all files in an album are converted simultaneously using background processes. Combined with `FFMPEG_THREADS="0"` (auto), this uses all your CPU cores.
+
+**When to use:**
+- Enable for fast machines with lots of RAM
+- Disable if you're memory-constrained or processing very large FLAC files
+
+### fatsort
+
+Car stereos read files in the physical order they appear in the FAT directory table, **not** alphabetically. `fatsort` physically reorders the entries so the stereo reads them correctly.
 
 ## Full USB drive workflow
 
 ### 1. Process the music
 
 ```bash
-./music-for-car.sh ~/Music ~/mp3_para_auto
+./music-for-car.sh -p classic_cargo ~/Music ~/mp3_para_auto
 ```
 
 ### 2. Format the USB drive as FAT32
@@ -82,8 +171,6 @@ cp -r ~/mp3_para_auto/* /run/media/dante/CAR_MUSIC/
 ```
 
 ### 4. Sort with fatsort (CRUCIAL)
-
-The Sony CDX-GT500US reads files in the physical order they appear in the FAT directory table, **not** alphabetically. `fatsort` physically reorders the entries so the stereo reads them correctly.
 
 ```bash
 # Unmount first (fatsort requires the device to be unmounted)
@@ -129,47 +216,9 @@ The `(Year)` at the end is optional. Everything else is parsed as `Band` and `Al
 
 All names are pure ASCII: no accents, no ñ, no quotes, no parentheses.
 
-### Audio
-
-| Property | Value |
-|---|---|
-| Codec | MP3 (libmp3lame) |
-| Bitrate | 256 kbps CBR |
-| Sample rate | 44100 Hz |
-| Channels | 2 (stereo) |
-| Highpass | 100 Hz |
-| Loudness | -16 LUFS (two-pass loudnorm) |
-| True Peak | -1.5 dBTP |
-| LRA | 11 LU |
-
 ### ID3v2.3 Metadata
 
-Only includes: `title`, `artist`, `album`, `track`, `genre`. Everything else is stripped (embedded images, comments, encoder info, etc.).
-
-## Why these decisions
-
-### MP3 256kbps CBR
-
-- Maximum compatibility with car stereos
-- CBR is more stable for older decoders than VBR
-- 256kbps is transparent for most listeners
-- Saves space vs FLAC (~4-5x less)
-
-### Highpass at 100 Hz
-
-Car speakers can't reproduce frequencies below ~80-100 Hz. Removing them saves bitrate that would otherwise be wasted on inaudible information.
-
-### Loudnorm two-pass
-
-Each album/song has a different mastering level. Without normalization, you'd have to manually adjust volume between tracks. The two-pass loudnorm first measures the actual loudness of each file, then applies the exact correction so everything plays at the same perceived volume.
-
-### fatsort
-
-Without fatsort, the stereo reads files in the order they were written to the FAT filesystem, which depends on the filesystem and not the name. This causes songs to play in random order. `fatsort` physically reorders the directory entries on the device to match alphabetical order.
-
-### Audio stream only (-map 0:a)
-
-FLAC files often have cover art embedded as video streams. Without `-map 0:a`, ffmpeg would include them in the MP3 as embedded PNG/JPEG images, unnecessarily inflating file size.
+Only includes: `title`, `artist`, `album`, `track`. Everything else is stripped (embedded images, comments, encoder info, etc.).
 
 ## Considerations
 
@@ -181,7 +230,7 @@ FLAC files often have cover art embedded as video streams. Without `-map 0:a`, f
 
 ## Log
 
-Each run generates a `processing.log` in the destination directory with details of every processed file.
+Each run generates a `processing.log` in the script's directory (overwritten each run).
 
 ## License
 

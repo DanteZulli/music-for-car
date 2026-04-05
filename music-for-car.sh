@@ -24,7 +24,8 @@ fi
 
 MUSIC_DIR="$1"
 WORK_DIR="$2"
-LOG_FILE="$WORK_DIR/processing.log"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LOG_FILE="$SCRIPT_DIR/processing.log"
 
 mkdir -p "$WORK_DIR"
 : > "$LOG_FILE"

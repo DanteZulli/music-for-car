@@ -28,7 +28,7 @@ A single bash script (`music-for-car.sh`) that converts audio files to MP3 optim
 - **Audio output**: MP3 256kbps CBR, 44100 Hz, stereo, highpass 100 Hz, loudnorm two-pass (I=-16, TP=-1.5, LRA=11).
 - **ID3 tags**: only title, artist, album, track, genre (hardcoded to "Rock"). Everything else stripped.
 - **Sanitization**: all folder/file names converted to ASCII via `iconv` + `sed`.
-- **Generates** `processing.log` in the destination directory.
+- **Generates** `processing.log` in the script's directory (overwritten each run).
 
 ## Conventions
 

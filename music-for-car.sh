@@ -4,18 +4,14 @@ set -euo pipefail
 ###############################################################################
 # music-for-car.sh
 #
-# Procesa carpetas de música para un pendrive de auto (Sony CDX-GT500US):
-#   - Renombra carpetas: "NN - Banda - Disco" (sin caracteres especiales)
+# Procesa carpetas de musica para un pendrive de auto (Sony CDX-GT500US):
+#   - Renombra carpetas: "Banda - Disco" (sin caracteres especiales)
 #   - Convierte TODO a MP3 256kbps CBR
 #   - Aplica highpass a 100 Hz + loudnorm (I=-16, TP=-1.5, LRA=11)
 #   - Sanea metadatos ID3
 #
 # Uso:
 #   ./music-for-car.sh <carpeta_fuente> <carpeta_destino>
-#
-# Ejemplo:
-#   ./music-for-car.sh ~/Music ~/mp3_para_auto
-#   ./music-for-car.sh ~/Music/"2 Minutos - Vida Monotona (2015)" ~/mp3_para_auto
 ###############################################################################
 
 if [ $# -lt 2 ]; then
@@ -135,13 +131,9 @@ log "=========================================="
 
 # Determinar si MUSIC_DIR es un album individual o un directorio con multiples albumes
 if count_audio_files "$MUSIC_DIR" | grep -q '^[1-9]'; then
-    # Es un album individual
     FOLDERS=("$MUSIC_DIR")
-    SINGLE_MODE=true
 else
-    # Es un directorio con multiples albumes
     mapfile -t FOLDERS < <(find "$MUSIC_DIR" -mindepth 1 -maxdepth 1 -type d | sort)
-    SINGLE_MODE=false
 fi
 
 TOTAL=${#FOLDERS[@]}
@@ -163,13 +155,7 @@ for folder in "${FOLDERS[@]}"; do
     band=$(sanitize "$band")
     album=$(sanitize "$album")
 
-    if [ "$SINGLE_MODE" = true ]; then
-        dest_folder_name="$band - $album"
-    else
-        padded_num=$(printf "%02d" "$COUNTER")
-        dest_folder_name="${padded_num} - ${band} - ${album}"
-    fi
-
+    dest_folder_name="$band - $album"
     dest_path="$WORK_DIR/$dest_folder_name"
 
     log "[$COUNTER/$TOTAL] Procesando: $folder_name -> $dest_folder_name ($audio_count archivos)"
@@ -184,15 +170,22 @@ for folder in "${FOLDERS[@]}"; do
         file_base=$(basename "$audio_file")
         file_no_ext="${file_base%.*}"
 
-        extracted_track=$(echo "$file_no_ext" | grep -oP '^[0-9]+' || true)
-        if [ -n "$extracted_track" ]; then
-            padded_track=$(printf "%02d" "$((10#$extracted_track))")
-            file_no_ext=$(echo "$file_no_ext" | sed -E 's/^[0-9]+[. -]+//')
+        # Limpiar prefijos numericos del nombre (puede haber multiples: "01 - 01 - ...")
+        file_no_ext=$(echo "$file_no_ext" | sed -E 's/^([0-9]+[. -]+)+//')
+        # Limpiar prefijos tipo "Banda_Nombre_XX_" (nombres compuestos con track embebido)
+        embedded_track=$(echo "$file_no_ext" | grep -oP '(?<=_)[0-9]{2}(?=_)' | head -1 || true)
+        if [ -n "$embedded_track" ]; then
+            file_no_ext=$(echo "$file_no_ext" | sed -E "s/^.*_${embedded_track}_//")
         fi
 
         out_name="${padded_track} - ${file_no_ext}.mp3"
         out_name=$(sanitize "$out_name")
         out_path="$dest_path/$out_name"
+
+        # Extraer track original para metadatos
+        orig_track=$(ffprobe -v quiet -show_entries format_tags=track -of csv=p=0 "$audio_file" 2>/dev/null || echo "")
+        orig_track=$(echo "$orig_track" | cut -d'/' -f1 | sed 's/^0*//')
+        [ -z "$orig_track" ] || [ "$orig_track" -eq 0 ] 2>/dev/null && orig_track="$padded_track"
 
         orig_artist=$(ffprobe -v quiet -show_entries format_tags=artist -of csv=p=0 "$audio_file" 2>/dev/null || echo "")
         orig_album=$(ffprobe -v quiet -show_entries format_tags=album -of csv=p=0 "$audio_file" 2>/dev/null || echo "")

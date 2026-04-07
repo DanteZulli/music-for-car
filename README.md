@@ -208,8 +208,7 @@ The `(Year)` at the end is optional. Everything else is parsed as `Band` and `Al
 
 ### Folders
 
-- **Multi-album mode**: `01 - Band - Album Name`
-- **Single album mode**: `Band - Album Name`
+- `Band - Album Name`
 
 ### Files
 

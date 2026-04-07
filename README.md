@@ -2,15 +2,17 @@
 
 Bash script to convert audio files from any format to MP3 optimized for car USB drives.
 
-## Disclaimer
+![Script output showing album conversion progress in the terminal](images/image.png)
 
-I built this for my own setup — an old **Sony CDX-GT500US** head unit and a pair of 4-inch car speakers. After experimenting, I found this to be the best way to organize and migrate my music collection to my car stereo regardless of the source format. It eliminates sub-bass rumble that distorts my small speakers, reduces song loading failures to zero, and saves USB space.
+## Purpose & Context
 
-These settings and choices are tuned for my hardware. They may not be ideal for yours. Treat this as a starting point you can adapt, not a universal prescription.
+This script started as a personal tool — I built it through trial and error for my own setup: an old **Sony CDX-GT500US** head unit and a pair of 4-inch car speakers. After a lot of tweaking, I landed on settings that give me clean sound with no distortion, no weird noises, no speaker vibrations, decent load times, and a solid space saving compared to FLAC.
 
-## Context
+I decided to share it publicly, documenting every decision I made and adding a profile system so others can adapt it to their own hardware.
 
-Created for my **Sony CDX-GT500US** with a 64GB USB drive. The original music was in FLAC (and other formats) with cover art, lyrics files, and special characters in filenames that the stereo couldn't read correctly.
+These defaults are tuned for my specific car. They may not be ideal for yours — treat this as a starting point you can customize, not a universal prescription.
+
+![Sony CDX-GT500US car stereo](images/stereo.jpeg)
 
 ## What it does
 

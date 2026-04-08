@@ -266,6 +266,11 @@ for folder in "${FOLDERS[@]}"; do
     dest_folder_name="$band - $album"
     dest_path="$WORK_DIR/$dest_folder_name"
 
+    if [ -d "$dest_path" ]; then
+        log "[$COUNTER/$TOTAL] SKIP (exists): $dest_folder_name"
+        continue
+    fi
+
     log "[$COUNTER/$TOTAL] Processing: $folder_name -> $dest_folder_name ($audio_count files)"
 
     mkdir -p "$dest_path"
